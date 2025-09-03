@@ -150,6 +150,64 @@ browser = await chromium.launch({
 5. **Health Checks**: Avoid `/healthz` path - it's intercepted by Google Cloud infrastructure
 6. **Version Pinning**: Pin Playwright version in package.json to match Docker image tag
 
+## Common Pitfalls & Solutions
+
+During implementation, we encountered and solved several critical issues:
+
+### 1. Docker Base Image Compatibility 🔧
+**Problem**: Started with `mcr.microsoft.com/playwright:v1.40.0-jammy` but faced package version conflicts and browser launch failures.
+
+**Solution**: Evolved through multiple versions:
+- ❌ `v1.40.0-jammy` → Package conflicts
+- ⚠️ `v1.48.2-noble` → Better but still issues  
+- ✅ `v1.55.0-noble` → Final stable version
+
+**Key Lesson**: Always pin Playwright version in `package.json` to exactly match the Docker image tag.
+
+### 2. Container Networking Mystery 🌐
+**Problem**: Service deployed successfully but was unreachable. Cloud Run health checks failed with connection errors.
+
+**Root Cause**: Server was only listening on `localhost` (127.0.0.1), but Cloud Run needs to connect from external load balancers.
+
+**Solution**: 
+```javascript
+// ❌ This fails on Cloud Run
+server.listen(PORT, () => { ... });
+
+// ✅ This works - must bind to 0.0.0.0  
+server.listen(PORT, '0.0.0.0', () => { ... });
+```
+
+### 3. The `/healthz` Endpoint Mystery 👻
+**Problem**: `/healthz` endpoint returned Google's 404 page instead of our application response, even though other endpoints worked perfectly.
+
+**Investigation**: Created a test `/status` endpoint which worked fine on the same URLs, revealing the issue wasn't with our code.
+
+**Root Cause**: Google Cloud Run infrastructure reserves certain paths (like `/healthz`) for load balancer and infrastructure-level health checking. Requests to these paths never reach the application container.
+
+**Solution**: Use alternative paths like `/status` for application health checks.
+
+### 4. Package Lock Synchronization Issues 🔒
+**Problem**: When upgrading Playwright versions, encountered dependency resolution errors and version mismatches.
+
+**Solution**: After changing Playwright version in `package.json`:
+```bash
+rm package-lock.json
+npm install  # Regenerates lock file with correct versions
+```
+
+**Key Lesson**: Always regenerate lock files when upgrading major dependencies.
+
+### 5. Browser Launch Race Conditions 🏃‍♂️
+**Problem**: Multiple concurrent requests caused browser launch failures and memory issues.
+
+**Solution**: Set Cloud Run concurrency to 1:
+```bash
+gcloud run deploy --concurrency 1
+```
+
+**Why**: Chromium launches are resource-intensive and can conflict when starting simultaneously in containers.
+
 ## Troubleshooting
 
 ### Common Issues
