@@ -1,0 +1,20 @@
+{
+  "name": "playwright-title-service",
+  "version": "1.0.0",
+  "description": "Playwright service for extracting page titles on Google Cloud Run",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "deploy": "export PROJECT_ID=chefswiz && export REGION=europe-west1 && export SERVICE=playwright-title && export IMG_TAG=$(date +%Y%m%d-%H%M%S) && export IMAGE=gcr.io/$PROJECT_ID/$SERVICE:$IMG_TAG && gcloud builds submit --tag $IMAGE && gcloud run deploy $SERVICE --image $IMAGE --region $REGION --platform managed --allow-unauthenticated --memory 2Gi --concurrency 1 --timeout 60",
+    "health": "curl -i \"https://playwright-title-368152909186.europe-west1.run.app/status\"",
+    "test-title": "curl -i \"https://playwright-title-368152909186.europe-west1.run.app/title?url=${URL:-https://example.com}\""
+  },
+  "dependencies": {
+    "playwright": "1.55.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
